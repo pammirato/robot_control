@@ -119,6 +119,9 @@ endif()
 # add_executable(robot_control_node src/robot_control_node.cpp)
 
 add_executable(keyboard_control src/keyboard_control.cpp)
+add_executable(grid_map_control src/grid_map_control.cpp)
+add_executable(simple_grid_motion src/simple_grid_motion.cpp)
+
 
 
 ## Add cmake target dependencies of the executable/library
@@ -127,6 +130,14 @@ add_executable(keyboard_control src/keyboard_control.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(keyboard_control
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
+target_link_libraries(grid_map_control
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
+target_link_libraries(simple_grid_motion
    ${catkin_LIBRARIES}
    ${CURSES_LIBRARIES}
  )
