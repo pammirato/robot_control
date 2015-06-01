@@ -2,6 +2,8 @@
 #include "geometry_msgs/Twist.h"
 #include "std_msgs/String.h"
 
+#include "rosaria/get_state.h"
+
 #include <stdio.h>
 #include <errno.h>
 #include <ncurses.h>
@@ -15,6 +17,16 @@
 
 #include <string>
 #include <sstream>
+
+
+#define WAIT_TO_MOVE_TIME .5
+#define MOVE_DISTANCE 100
+#define ROTATION_ANGLE 45
+
+
+
+
+
 
 namespace patch
 {
@@ -61,28 +73,54 @@ int main(int argc, char **argv){
 
   ros::Publisher heading_pub = n.advertise<std_msgs::String>("/RosAria/heading",publish_buffer_size);
 
+  //register client to get robot state service 
+  ros::ServiceClient get_state_client = n.serviceClient<rosaria::get_state>("/RosAria/get_state");
+  rosaria::get_state get_state_srv; //service object, has request/response
 
-
+  //what frequecny the main loop will run at TODO do i neeid this
   ros::Rate loop_rate(1);//run at  x HZ
 
+ //how long to wait for robot to stop moving
+  ros::Duration wait = ros::Duration(WAIT_TO_MOVE_TIME);
+  
   std_msgs::String msg;
-  std::stringstream ss;
 
   int counter = 0;
   while(ros::ok())
   {
-   
-    ss <<  45;
-    msg.data = ss.str();
+/* 
+    //get the state of the robot
+    while(!get_state_client.call(get_state_srv));
+     
+    //wait until the robot has stopped moving to issue a move command
+    while(!(get_state_srv.response.isStopped))
+    {
+      ROS_INFO("ROBOT STIL moving");
+      wait.sleep();
+      while(!get_state_client.call(get_state_srv)){
+        ROS_INFO("failed service call!");
+      }
+    } 
+      
+
+*/
+ 
    
     if(counter%2==0)
     { 
+      ROS_INFO("move command");
+      msg.data = patch::to_string(MOVE_DISTANCE);
       move_pub.publish(msg);
     } 
     else
     {
-      heading_pub.publish(msg); 
+      ROS_INFO("rot commnad");
+      msg.data = patch::to_string(ROTATION_ANGLE);
+      heading_pub.publish(msg);
     }
+
+
+
 
     ros::spinOnce();//so our callbacks get called
     loop_rate.sleep();
