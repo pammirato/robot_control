@@ -1,43 +1,157 @@
-#include "ros/ros.h"
-#include "geometry_msgs/Twist.h"
-#include "std_msgs/String.h"
-
-#include "rosaria/get_state.h"
-
-#include <stdio.h>
-#include <errno.h>
-#include <ncurses.h>
-#include <iostream>
-/*#ifdef ADEPT_PKG
-  #include <Aria.h>
-#else
-  #include <Aria/Aria.h>
-#endif
-*/
-
-#include <string>
-#include <sstream>
+#include <simple_grid_motion.h>
 
 
 #define WAIT_TO_MOVE_TIME .5
+#define WAIT_TO_TURN_TIME .2
 #define MOVE_DISTANCE 100
 #define ROTATION_ANGLE 45
+#define CHANGE_ROW_OFFSET -50
 
 
 
+SimpleGridMotion::SimpleGridMotion() {}
 
 
-
-namespace patch
+bool SimpleGridMotion::initialize()
 {
-    template < typename T > std::string to_string( const T& n )
-    {
-        std::ostringstream stm ;
-        stm << n ;
-        return stm.str() ;
+
+  nh = ros::NodeHandle("~");
+
+  //set parameters from command line
+  nh.getParam("width", grid_width);
+  nh.getParam("height", grid_height);
+  nh.getParam("resolution", grid_res);
+  nh.getParam("rotation_angle", turn_res);
+ 
+  ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f", grid_width, grid_height, grid_res, turn_res);
+  
+   //register client
+   get_state_client = nh.serviceClient<rosaria::get_state>("/RosAria/get_state");
+  move_client = nh.serviceClient<rosaria::float_message>("/RosAria/move");
+  heading_client = nh.serviceClient<rosaria::float_message>("/RosAria/heading");
+  
+  enable_motors_client  = nh.serviceClient<std_srvs::Empty>("/RosAria/enable_motors");
+  enable_motors_client.call(enable_motors_srv); //enable the motors
+
+  //how long to wait for robot to stop moving
+  trans_wait = ros::Duration(WAIT_TO_MOVE_TIME);
+  turn_wait = ros::Duration(WAIT_TO_TURN_TIME);
+  
+
+  return true;
+}//end initialize
+
+
+
+bool SimpleGridMotion::wait_until_stopped(ros::Duration wait, int  max_iterations=100)
+{
+  wait.sleep();
+  int count = 0;
+  //get the state of the robot
+  while(!get_state_client.call(get_state_srv));
+  
+  ROS_INFO("IS STOPPED: %d", get_state_srv.response.isStopped); 
+  //wait until the robot has stopped moving to issue a move command
+  while(!(get_state_srv.response.isStopped) && count < max_iterations)
+  {
+    ROS_INFO("ROBOT STILL moving");
+    wait.sleep();
+    while(!get_state_client.call(get_state_srv)){
+      ROS_INFO("failed service call!");
     }
+    count++;
+  } 
+
+}//end is robot stopped
+
+
+bool SimpleGridMotion::do_rotation(double total_degrees, double step_size,
+                                    bool ccw)
+{
+  step_size = abs(step_size);
+  int num_turns = total_degrees/step_size;//total turns to do 
+   
+  int count = 0;//current num of turns executed
+ 
+  if(!ccw)
+  {
+    step_size = -step_size;
+  } 
+
+  while(count < num_turns)
+  {
+    turn(step_size);
+    count++;
+  }
+
+  return true;
+}//end do_rotation
+
+
+bool SimpleGridMotion::turn(double degrees)
+{
+  if(!wait_until_stopped(turn_wait))
+  { 
+    return false;
+  }
+  float_srv.request.input = degrees;
+  if(!heading_client.call(float_srv))
+  { 
+   return false;
+  }
+  return true;
+}//end turn
+
+
+
+bool SimpleGridMotion::do_translation(double millimeters)
+{
+
+  if(!wait_until_stopped(trans_wait))
+  { 
+    return false;
+  }
+  float_srv.request.input = millimeters;
+  if(!move_client.call(float_srv))
+  { 
+   return false;
+  }
+
+  return true;
 }
 
+
+
+
+
+int SimpleGridMotion::run()
+{
+  if(!initialize())
+  {
+    return false;
+  }
+
+  ROS_INFO("HERE");
+  do_rotation(90,45,true);
+  do_translation(250);
+
+  ROS_INFO("HERE2");
+
+ 
+/*
+  while(ros::ok())
+  {
+
+    if(!wait_until_stopped(trans_wait, 100))
+    {
+      return -1;
+    }
+
+    ros::spinOnce();//so our callbacks get called
+  }
+*/
+
+}//end run
 
 
 
@@ -51,89 +165,9 @@ int main(int argc, char **argv){
 
 
   ros::init(argc, argv, "controller");
-  ros::NodeHandle n = ros::NodeHandle("~");
 
-  //parameters in meters
-  double grid_width = 10;
-  double grid_height = 10;
-  double grid_resolution = .5;
-
-  //set parameters from command line
-  n.getParam("width", grid_width);
-  n.getParam("height", grid_height);
-  n.getParam("resolution", grid_resolution);
- 
-  ROS_INFO("PARAMS W:%f  H:%f R:%f", grid_width, grid_height, grid_resolution);
-
-  int publish_buffer_size = 10;
-
-
- //register publishers
-  ros::Publisher move_pub = n.advertise<std_msgs::String>("/RosAria/move",publish_buffer_size);
-
-  ros::Publisher heading_pub = n.advertise<std_msgs::String>("/RosAria/heading",publish_buffer_size);
-
-  //register client to get robot state service 
-  ros::ServiceClient get_state_client = n.serviceClient<rosaria::get_state>("/RosAria/get_state");
-  rosaria::get_state get_state_srv; //service object, has request/response
-
-  //what frequecny the main loop will run at TODO do i neeid this
-  ros::Rate loop_rate(1);//run at  x HZ
-
- //how long to wait for robot to stop moving
-  ros::Duration wait = ros::Duration(WAIT_TO_MOVE_TIME);
-  
-  std_msgs::String msg;
-
-  int counter = 0;
-  while(ros::ok())
-  {
-/* 
-    //get the state of the robot
-    while(!get_state_client.call(get_state_srv));
-     
-    //wait until the robot has stopped moving to issue a move command
-    while(!(get_state_srv.response.isStopped))
-    {
-      ROS_INFO("ROBOT STIL moving");
-      wait.sleep();
-      while(!get_state_client.call(get_state_srv)){
-        ROS_INFO("failed service call!");
-      }
-    } 
-      
-
-*/
- 
-   
-    if(counter%2==0)
-    { 
-      ROS_INFO("move command");
-      msg.data = patch::to_string(MOVE_DISTANCE);
-      move_pub.publish(msg);
-    } 
-    else
-    {
-      ROS_INFO("rot commnad");
-      msg.data = patch::to_string(ROTATION_ANGLE);
-      heading_pub.publish(msg);
-    }
-
-
-
-
-    ros::spinOnce();//so our callbacks get called
-    loop_rate.sleep();
-    counter++;
-  }
-
-
-
-
-
-
-
-
+  SimpleGridMotion sgm = SimpleGridMotion();
+  sgm.run();
 
   return 0;
 
