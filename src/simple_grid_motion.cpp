@@ -1,160 +1,98 @@
 #include <simple_grid_motion.h>
 
 
-#define WAIT_TO_MOVE_TIME .5
-#define WAIT_TO_TURN_TIME .2
-#define MOVE_DISTANCE 100
-#define ROTATION_ANGLE 45
-#define CHANGE_ROW_OFFSET -50
 
 
-
-SimpleGridMotion::SimpleGridMotion() {}
-
-
-bool SimpleGridMotion::initialize()
+SimpleGridMotion::SimpleGridMotion()
 {
-
-  nh = ros::NodeHandle("~");
-
-  //set parameters from command line
-  nh.getParam("width", grid_width);
-  nh.getParam("height", grid_height);
-  nh.getParam("resolution", grid_res);
-  nh.getParam("rotation_angle", turn_res);
- 
-  ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f", grid_width, grid_height, grid_res, turn_res);
-  
-   //register client
-   get_state_client = nh.serviceClient<rosaria::get_state>("/RosAria/get_state");
-  move_client = nh.serviceClient<rosaria::float_message>("/RosAria/move");
-  heading_client = nh.serviceClient<rosaria::float_message>("/RosAria/heading");
-  
-  enable_motors_client  = nh.serviceClient<std_srvs::Empty>("/RosAria/enable_motors");
-  enable_motors_client.call(enable_motors_srv); //enable the motors
-
-  //how long to wait for robot to stop moving
-  trans_wait = ros::Duration(WAIT_TO_MOVE_TIME);
-  turn_wait = ros::Duration(WAIT_TO_TURN_TIME);
-  
-
-  return true;
-}//end initialize
-
-
-
-bool SimpleGridMotion::wait_until_stopped(ros::Duration wait, int  max_iterations=100)
-{
-  wait.sleep();
-  int count = 0;
-  //get the state of the robot
-  while(!get_state_client.call(get_state_srv));
-  
-  ROS_INFO("IS STOPPED: %d", get_state_srv.response.isStopped); 
-  //wait until the robot has stopped moving to issue a move command
-  while(!(get_state_srv.response.isStopped) && count < max_iterations)
-  {
-    ROS_INFO("ROBOT STILL moving");
-    wait.sleep();
-    while(!get_state_client.call(get_state_srv)){
-      ROS_INFO("failed service call!");
-    }
-    count++;
-  } 
-
-}//end is robot stopped
-
-
-bool SimpleGridMotion::do_rotation(double total_degrees, double step_size,
-                                    bool ccw)
-{
-  step_size = abs(step_size);
-  int num_turns = total_degrees/step_size;//total turns to do 
-   
-  int count = 0;//current num of turns executed
- 
-  if(!ccw)
-  {
-    step_size = -step_size;
-  } 
-
-  while(count < num_turns)
-  {
-    turn(step_size);
-    count++;
-  }
-
-  return true;
-}//end do_rotation
-
-
-bool SimpleGridMotion::turn(double degrees)
-{
-  if(!wait_until_stopped(turn_wait))
-  { 
-    return false;
-  }
-  float_srv.request.input = degrees;
-  if(!heading_client.call(float_srv))
-  { 
-   return false;
-  }
-  return true;
-}//end turn
-
-
-
-bool SimpleGridMotion::do_translation(double millimeters)
-{
-
-  if(!wait_until_stopped(trans_wait))
-  { 
-    return false;
-  }
-  float_srv.request.input = millimeters;
-  if(!move_client.call(float_srv))
-  { 
-   return false;
-  }
-
-  return true;
+  initialize();
 }
 
 
 
+//main logic here
 
-
+//GOAL: visit every grid point, turn 360 and back
 int SimpleGridMotion::run()
 {
-  if(!initialize())
+
+
+
+  bool left = true;//whether to go left or right
+  int num_cols = grid_width/grid_res;
+  int num_rows = grid_height/grid_res;
+  int num_rows_done = 0;
+  double trans_dist = grid_res;
+  double end_dist = grid_res - turn_offset;
+
+
+
+  //while we have no traversed every row 
+  while(num_rows_done < num_rows)
   {
-    return false;
-  }
 
-  ROS_INFO("HERE");
-  do_rotation(90,45,true);
-  do_translation(250);
-
-  ROS_INFO("HERE2");
-
- 
-/*
-  while(ros::ok())
-  {
-
-    if(!wait_until_stopped(trans_wait, 100))
+    //whether we are going left or right
+    if(!left)
     {
-      return -1;
+      trans_dist *= -1;
     }
 
-    ros::spinOnce();//so our callbacks get called
-  }
-*/
+    //360, then go to next grid point
+    for(int i=0;i<num_cols;i++)
+    {
+      robot.do_rotation(361, turn_res,true);
+      robot.do_rotation(361, 90,false);
+      ROS_INFO("ROT 2 DONE");
+      robot.do_translation(trans_dist*METERS_TO_MILLIMETERS);
+    }//end for i 
+
+
+    //360
+    robot.do_rotation(361, turn_res,true);
+    robot.do_rotation(361, turn_res,false);
+
+    //go to next row in grid
+    robot.turn(90);
+    robot.do_translation(end_dist*METERS_TO_MILLIMETERS);
+    robot.turn(-90);
+
+
+
+    num_rows_done++;
+  }//end while num_rows_done 
+
+  
 
 }//end run
 
 
 
+//initialize the ros node and paramterrs
+bool SimpleGridMotion::initialize()
+{
+
+  //conotrols the robot
+  robot = AriaRobotControl();
+
+  //defaults
+  grid_width = 1;  
+  grid_height = 1;
+  grid_res = .5;
+  turn_res = 45;
+  turn_offset = .1;
+  nh = ros::NodeHandle("~");
+
+  //set parameters from command line
+  nh.getParam("grid_width", grid_width);
+  nh.getParam("grid_height", grid_height);
+  nh.getParam("grid_res", grid_res);
+  nh.getParam("turn_res", turn_res);
+  nh.getParam("turn_offset", turn_offset);
+  ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f TO:%f", grid_width, grid_height, grid_res, turn_res, turn_offset);
+  
+
+  return true;
+}//end initialize
 
 
 

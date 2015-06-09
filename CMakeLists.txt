@@ -1,6 +1,29 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(robot_control)
 
+
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBT_USE_DOUBLE_PRECISION -Wall")
+# Unused warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wuninitialized -Winit-self -Wunused-function -Wunused-label -Wunused-variable -Wunused-but-set-variable -Wunused-but-set-parameter")
+# Additional warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Warray-bounds -Wtype-limits -Wreturn-type -Wsequence-point -Wparentheses -Wmissing-braces -Wchar-subscripts -Wswitch -Wwrite-strings -Wenum-compare -Wempty-body -Wlogical-op")
+
+# Check for c++11 support
+INCLUDE(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+IF(COMPILER_SUPPORTS_CXX11)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+ELSEIF(COMPILER_SUPPORTS_CXX0X)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+ELSE()
+  MESSAGE(ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+ENDIF()
+
+
+
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -112,17 +135,42 @@ endif()
 
 
 ## Declare a cpp library
-# add_library(robot_control
-#   src/${PROJECT_NAME}/robot_control.cpp
+#add_library(robot_control
+#   src/aria_robot_control.cpp
 # )
 
 ## Declare a cpp executable
 # add_executable(robot_control_node src/robot_control_node.cpp)
 
 add_executable(keyboard_control src/keyboard_control.cpp)
-add_executable(grid_map_control src/grid_map_control.cpp)
-add_executable(simple_grid_motion src/simple_grid_motion.cpp)
+target_link_libraries(keyboard_control
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
 
+
+
+add_executable(grid_map_control src/grid_map_control.cpp)
+target_link_libraries(grid_map_control
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
+
+
+
+add_executable(simple_grid_motion src/simple_grid_motion.cpp src/aria_robot_control.cpp)
+target_link_libraries(simple_grid_motion
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
+
+
+
+add_executable(simple_grid_motion_localization src/simple_grid_motion_localization.cpp src/aria_robot_control.cpp src/point.cpp)
+target_link_libraries(simple_grid_motion_localization
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
 
 
 ## Add cmake target dependencies of the executable/library
@@ -130,18 +178,6 @@ add_executable(simple_grid_motion src/simple_grid_motion.cpp)
 # add_dependencies(robot_control_node robot_control_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(keyboard_control
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
-target_link_libraries(grid_map_control
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
-target_link_libraries(simple_grid_motion
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
 
 #############
 ## Install ##
