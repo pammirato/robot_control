@@ -35,6 +35,7 @@ class SimpleGridMotion
 
     
     ros::NodeHandle nh;
+    ros::ServiceClient save_client;    
 
     //functions
     bool initialize();

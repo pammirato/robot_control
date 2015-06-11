@@ -34,11 +34,14 @@ class AriaRobotControl
     ros::ServiceClient move_client;
     ros::ServiceClient heading_client;
     ros::ServiceClient enable_motors_client;
+    ros::ServiceClient save_images_client;
+
+
 
     rosaria::get_state get_state_srv; 
     rosaria::float_message float_srv; 
     std_srvs::Empty enable_motors_srv;
-
+    std_srvs::Empty save_images_srv;
 
 
     ros::Duration trans_wait;//how long to wait after a trans move
@@ -52,8 +55,8 @@ class AriaRobotControl
   public:
 
     //functions
-    bool wait_until_stopped(ros::Duration wait, int max_iterations);
-    bool do_rotation(double total_degrees, double step_size, bool cw);
+    bool wait_until_stopped(ros::Duration wait, int max_iterations=100);
+    bool do_rotation(double total_degrees, double step_size, bool cw, bool save_images=false);
     bool turn(double degrees);
     bool do_translation(double millimeters);
 

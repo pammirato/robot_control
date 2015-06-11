@@ -27,7 +27,7 @@ int SimpleGridMotion::run()
 
 
 
-  //while we have no traversed every row 
+  //while we have not traversed every row 
   while(num_rows_done < num_rows)
   {
 
@@ -40,7 +40,7 @@ int SimpleGridMotion::run()
     //360, then go to next grid point
     for(int i=0;i<num_cols;i++)
     {
-      robot.do_rotation(361, turn_res,true);
+      robot.do_rotation(361, turn_res,true,true);
       robot.do_rotation(361, 90,false);
       ROS_INFO("ROT 2 DONE");
       robot.do_translation(trans_dist*METERS_TO_MILLIMETERS);
@@ -48,20 +48,20 @@ int SimpleGridMotion::run()
 
 
     //360
-    robot.do_rotation(361, turn_res,true);
-    robot.do_rotation(361, turn_res,false);
+    robot.do_rotation(361, turn_res,true, true);
+    robot.do_rotation(361, 90,false);
 
     //go to next row in grid
-    robot.turn(90);
+    robot.do_rotation(90,90,true);
     robot.do_translation(end_dist*METERS_TO_MILLIMETERS);
-    robot.turn(-90);
+    robot.do_rotation(90,90,false);
 
 
 
     num_rows_done++;
   }//end while num_rows_done 
 
-  
+ return 1; 
 
 }//end run
 
@@ -89,7 +89,8 @@ bool SimpleGridMotion::initialize()
   nh.getParam("turn_res", turn_res);
   nh.getParam("turn_offset", turn_offset);
   ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f TO:%f", grid_width, grid_height, grid_res, turn_res, turn_offset);
-  
+ 
+  save_client = nh.serviceClient<std_srvs::Empty>("save_images"); 
 
   return true;
 }//end initialize

@@ -14,6 +14,9 @@ AriaRobotControl::AriaRobotControl()
   enable_motors_client  = nh.serviceClient<std_srvs::Empty>("/RosAria/enable_motors");
   enable_motors_client.call(enable_motors_srv); //enable the motors
 
+  save_images_client = nh.serviceClient<std_srvs::Empty>("/save_images");
+
+
   //how long to wait for robot to stop moving
   trans_wait = ros::Duration(WAIT_TO_MOVE_TIME);
   turn_wait = ros::Duration(WAIT_TO_TURN_TIME);
@@ -23,7 +26,7 @@ AriaRobotControl::AriaRobotControl()
 
 
 
-bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iterations=100)
+bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iterations)
 {
   wait.sleep();
   int count = 0;
@@ -52,8 +55,8 @@ bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iteration
 }//end is robot stopped
 
 
-bool AriaRobotControl::do_rotation(double total_degrees, double step_size,
-                                    bool ccw)
+bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool ccw, bool save_images)
+
 {
   step_size = abs(step_size);
   int num_turns = total_degrees/step_size;//total turns to do 
@@ -67,20 +70,38 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,
 
   while(count < num_turns)
   {
-    turn(step_size);
-    count++;
+    if(save_images)
+    {
+      if(!wait_until_stopped(turn_wait))
+      { 
+        ROS_ERROR("FAILED SAVE"); 
+      }
+      
+      if(!save_images_client.call(save_images_srv))
+      {
+        ROS_ERROR("FAILED SAVE"); 
+      }
+    }
+    if(!wait_until_stopped(turn_wait))
+    { 
+      return false;
+    }
+    else
+    {
+      ros::Duration(.5).sleep();//just for extra saftey
+      turn(step_size);  
+      count++;
+    }
   }
 
   return true;
 }//end do_rotation
 
 
+
+//GIVES TURN COMMNAD IMMEADITELY
 bool AriaRobotControl::turn(double degrees)
 {
-  if(!wait_until_stopped(turn_wait))
-  { 
-    return false;
-  }
   float_srv.request.input = degrees;
   if(!heading_client.call(float_srv))
   { 
