@@ -56,6 +56,7 @@ class AriaRobotControl
 
     //functions
     bool wait_until_stopped(ros::Duration wait, int max_iterations=100);
+    bool wait_until_stopped(double seconds, int max_iterations=100);
     bool do_rotation(double total_degrees, double step_size, bool cw, bool save_images=false);
     bool turn(double degrees);
     bool do_translation(double millimeters);

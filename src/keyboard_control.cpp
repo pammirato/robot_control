@@ -1,5 +1,6 @@
 #include "ros/ros.h"
 #include "geometry_msgs/Twist.h"
+#include "std_srvs/Empty.h"
 
 
 #include <stdio.h>
@@ -12,6 +13,10 @@
   #include <Aria/Aria.h>
 #endif
 */
+
+
+#include "aria_robot_control.h"
+
 
 #include <string>
 #include <sstream>
@@ -51,15 +56,30 @@ namespace patch
 
 int main(int argc, char **argv){
 
-
+  
   ros::init(argc, argv, "controller");
-  ros::NodeHandle n;
+  ros::NodeHandle nh = ros::NodeHandle("~");
 
   int publish_buffer_size = 10;
 
+  std::string save_1 = "/K1/save_images";
+  std::string save_2 = "/K2/save_images";
+  double turn_res = 15.0;
+
+  nh.getParam("base_name_1", save_1);
+  nh.getParam("base_name_2", save_2);
+  nh.getParam("turn_res",turn_res);
+    
+  //conotrols the robot
+  AriaRobotControl robot = AriaRobotControl();
 
 
-  ros::Publisher control_pub = n.advertise<geometry_msgs::Twist>("/RosAria/cmd_vel",publish_buffer_size);
+  ros::ServiceClient save_images_client1 = nh.serviceClient<std_srvs::Empty>(save_1);
+  ros::ServiceClient save_images_client2 = nh.serviceClient<std_srvs::Empty>(save_2);
+  std_srvs::Empty save_images_srv;
+  bool saved  = false;
+
+  ros::Publisher control_pub = nh.advertise<geometry_msgs::Twist>("/RosAria/cmd_vel",publish_buffer_size);
 
 
   //keep track of the robots current linear and angular speed
@@ -76,11 +96,11 @@ int main(int argc, char **argv){
   ros::Rate loop_rate(10);
 
 
-
-
-  while(ros::ok())
+  bool publish = true;
+  bool quit = false;
+  while(ros::ok() && !quit)
   {
-  
+    publish = true; 
     //int c = getch();
     char c;
     scanf(" %c",&c); 
@@ -92,7 +112,6 @@ int main(int argc, char **argv){
         cur_angular = 0.0;
         std::cout << "STOP" << std::endl;
         break;
-  
       case 'z':
         cur_linear = 0; 
         std::cout << "stop linear" << std::endl;
@@ -117,6 +136,32 @@ int main(int argc, char **argv){
         cur_angular += -angular_step;
         std::cout << "turning CW" << std::endl;
         break;
+      case 'r':
+        robot.do_rotation(turn_res,turn_res,true,false); 
+        saved = save_images_client1.call(save_images_srv);
+        std::cout << "saved " << saved << std::endl;
+        publish = false;//dont publish a velocity command
+        std::cout << "turning CCW " <<turn_res << std::endl;
+        break;
+      case 't':
+        robot.do_rotation(turn_res,turn_res,false,false); 
+        publish = false;
+        saved = save_images_client1.call(save_images_srv);
+        std::cout << "saved " << saved << std::endl;
+        std::cout << "turning CW " << turn_res << std::endl;
+        break;
+      case '1':
+        saved = save_images_client1.call(save_images_srv);
+        std::cout << "saved " << saved << std::endl;
+        break;
+      case '2':
+        saved = save_images_client2.call(save_images_srv);
+        std::cout << "saved " << saved << std::endl;
+        break;
+      case 'q':
+        quit = true;
+        publish = false; 
+        break;
       default:
         std::cout << "ERROR: " << patch::to_string(errno) << std::endl;
     
@@ -124,11 +169,14 @@ int main(int argc, char **argv){
 
     }//switch(c)
 
-
-    //set the linear speed, and angular speed.
-    message.linear.x = cur_linear;
-    message.angular.z = cur_angular;
-    control_pub.publish(message);
+    //if we want to publish velocity(not for degree turns)
+    if(publish)
+    {
+      //set the linear speed, and angular speed.
+      message.linear.x = cur_linear;
+      message.angular.z = cur_angular;
+      control_pub.publish(message);
+    }
  
     loop_rate.sleep();
   }//end while
@@ -138,7 +186,7 @@ int main(int argc, char **argv){
 
 
 
-
+  ros::shutdown();
 
   return 0;
 

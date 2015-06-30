@@ -55,6 +55,16 @@ bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iteration
 }//end is robot stopped
 
 
+
+bool AriaRobotControl::wait_until_stopped(double seconds, int  max_iterations)
+{
+  wait_until_stopped(ros::Duration(seconds), max_iterations);
+}
+
+
+
+
+
 bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool ccw, bool save_images)
 
 {

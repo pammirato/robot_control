@@ -1,91 +1,74 @@
 #include <simple_grid_motion_localization.h>
 
- 
-std::mutex mtx;
-
- 
-//initialize the ros node and paramterrs
-bool SimpleGridMotionLocalization::initialize()
-{
-
-  //conotrols the robot
-  robot = AriaRobotControl();
-
-  //defaults
-  grid_width = 1;  
-  grid_height = 1;
-  grid_res = .5;
-  turn_res = 45;
-  turn_offset = .1;
-  nh = ros::NodeHandle("~");
-
-  //set parameters from command line
-  nh.getParam("grid_width", grid_width);
-  nh.getParam("grid_height", grid_height);
-  nh.getParam("grid_res", grid_res);
-  nh.getParam("turn_res", turn_res);
-  nh.getParam("turn_offset", turn_offset);
-  ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f TO:%f", grid_width, grid_height, grid_res, turn_res, turn_offset);
-
-  //the robots current position
-  cur_point = Point();
-    
-  //initialize the goal points
-  int num_rows  = grid_height/grid_res;
-  int num_cols = grid_width/grid_res;
-  //allocate the memory 
-  goal_points = new Point* [num_rows];
-  for(int i=0; i<num_rows; i++)
-  {
-    goal_points[i] = new Point[num_cols];
-  }  
-
-  
-  for(int i=0; i<num_rows; i++)
-  {
-    for(int j=0; j<num_cols; j++)
-    {
-      goal_points[i][j] = Point(i*grid_res,j*grid_res,0,UNEXPLORED);
-    }//for j
-  }//for i   
- 
-
-//  SimpleGridMotionLocalization::mtx;//iI = std::mutex();
-  return true;
-}//end initialize
-
-
-
-
-void SimpleGridMotionLocalization::slam_odom_cb(nav_msgs::Odometry & msg)
-{
-  mtx.lock();
-
-  cur_point.x = msg.pose.pose.position.x;
-  cur_point.y = msg.pose.pose.position.y;
-
-  mtx.unlock();  
-
-}
-
-
 
 
 
 SimpleGridMotionLocalization::SimpleGridMotionLocalization()
 {
-  initialize();
-}
+  debug = true;
 
 
-SimpleGridMotionLocalization::~SimpleGridMotionLocalization()
-{
-  for(int i=0; i<(grid_height/grid_res); i++)
+  slam_odom_sub = nh.subscribe("/rtabmap/odom", 1, &SimpleGridMotionLocalization::slam_odom_cb, this);
+
+  //the robots current position
+  cur_point = Point();
+    
+  //initialize the goal points
+  int num_rows  = grid_height/grid_res +1;
+  int num_cols = grid_width/grid_res +1;
+
+
+  goal_points = std::vector<Point>(num_rows*num_cols);
+  
+  bool forward = true;//whether to put in the row forwards or backwards
+  //std::vector cur_row(num_cols);//holds the points for the current row
+  
+  //fill in the goal points row by row
+  for (int i=0; i<num_rows; i++)
   {
-   delete[] goal_points[i];
-  }  
-  delete[] goal_points; 
+    for (int j=0; j<num_cols; j++)
+    {
+      if(forward)
+      {
+        goal_points[i*num_cols + j] = Point(j,i,0,UNEXPLORED);
+      }
+      else
+      {
+        goal_points[i*num_cols + j] = Point(num_rows-1-j,i,0,UNEXPLORED);
+      }
+    } 
+
+    forward = !forward;
+    
+  }//for i       
+
+
+
+/*  for (unsigned int i=0; i<goal_points.size(); i++)
+  {
+    goal_points[i] = Point((i%num_cols)*grid_res,  
+                 floor(i/num_cols)*grid_res, 0, UNEXPLORED);
+  }//for i       
+*/
+
+/*  //allocate the memory 
+  goal_points = new Point* [num_rows];
+  for(int i=0; i<num_rows; i++)
+  {
+    goal_points[i] = new Point[num_cols];
+  }   
+
+  
+  for(int i=0; i<num_rows; i++)
+  {
+    for(int j=0; j<num_cols; j++)
+    {   
+      goal_points[i][j] = Point(i*grid_res,j*grid_res,0,UNEXPLORED);
+    }//for j
+  }//for i 
+*/
 }
+
 
 
 //main logic here
@@ -94,58 +77,138 @@ SimpleGridMotionLocalization::~SimpleGridMotionLocalization()
 int SimpleGridMotionLocalization::run()
 {
 
-
-
-  bool left = true;//whether to go left or right
-  int num_cols = grid_width/grid_res;
-  int num_rows = grid_height/grid_res;
-  int num_rows_done = 0;
-  double trans_dist = grid_res;
-  double end_dist = grid_res - turn_offset;
-
-
-
-  //while we have no traversed every row 
-  while(num_rows_done < num_rows)
+  ROS_INFO("RUNNNING LOCALIZATION"); 
+  bool planning_active = true;
+  int i = 0;
+ // for(unsigned int i=0;i<goal_points.size(); i++)
+  while(ros::ok())
   {
+    ros::spinOnce();  
 
-    //whether we are going left or right
-    if(!left)
+    if(planning_active)
     {
-      trans_dist *= -1;
-    }
-
-    //360, then go to next grid point
-    for(int i=0;i<num_cols;i++)
-    {
-      robot.do_rotation(361, turn_res,true);
-      robot.do_rotation(361, 90,false);
-      ROS_INFO("ROT 2 DONE");
-      robot.do_translation(trans_dist*METERS_TO_MILLIMETERS);
-    }//end for i 
+      ROS_INFO("HWEERE");
+      Point goal_point = goal_points[i];
+      int counter = 0;
+      while(!is_at_point(goal_point) && counter < 10)
+      {
+        ros::spinOnce();  
+        ROS_ERROR("not at point");
+        robot.wait_until_stopped(.5);
 
 
-    //360
-    robot.do_rotation(361, turn_res,true);
-    robot.do_rotation(361, turn_res,false);
-
-    //go to next row in grid
-    robot.turn(90);
-    robot.do_translation(end_dist*METERS_TO_MILLIMETERS);
-    robot.turn(-90);
+        //LOCK ACQQUIREDI
+        pthread_mutex_lock(&position_lock); 
+       
+        ROS_INFO("LOCK GAINED");
+        double desired_orientation = get_desired_orientation(goal_point); 
+        double orientation_diff =desired_orientation - cur_orientation ;
+        
+        double dist = cur_point.distance_to_2d(goal_point);  
 
 
 
-    num_rows_done++;
-  }//end while num_rows_done 
+        pthread_mutex_unlock(&position_lock); 
+        //LOCK RELEASSED
 
-  
-  return true;
+
+        ROS_INFO("LOCK RELEASED");
+        if(debug)
+        {
+          ROS_INFO("DO: %f, OD: %f, DIST: %f", desired_orientation, orientation_diff, dist);
+          ros::Duration(10).sleep();
+        }
+
+
+        if(!(orientation_diff < ORIENTATION_THRESHOLD_RADIANS))
+        {
+          ROS_INFO( "change orientation");
+          double angle = orientation_diff * 180 / M_PI;
+          bool ccw = true;
+          if(angle < 0)
+          {
+            ccw = false;
+          }
+
+          //only want to turn by turn_res at most
+          int num_rots = angle/turn_res;//num or roatations using turn_res
+          int subtotal = turn_res*num_rots;//total angle turned
+          int leftover = angle - subtotal;//amount left to turn < turn_res
+ 
+          rotate(subtotal,turn_res, ccw, false);
+          rotate(leftover, leftover, ccw, false);
+        }//if oreintation 
+
+        robot.do_translation(dist*METERS_TO_MILLIMETERS);
+        robot.wait_until_stopped(.5);
+
+      }//while  
+      i++;  
+      if(i >=goal_points.size())
+      {
+        ROS_INFO("done planning");
+        planning_active = false;
+      }//if i 
+      ROS_INFO("end of loop");
+    }//if planning_active 
+  }//for i 
+
+
+ return 1; 
+
 }//end run
 
 
 
 
+
+
+void SimpleGridMotionLocalization::slam_odom_cb(nav_msgs::Odometry::ConstPtr  odom_msg)
+{
+  double x = odom_msg->pose.pose.position.x;
+  double y = odom_msg->pose.pose.position.y;
+  double z = odom_msg->pose.pose.position.z;
+
+  double qx = odom_msg->pose.pose.orientation.x;
+  double qy = odom_msg->pose.pose.orientation.y;
+  double qz = odom_msg->pose.pose.orientation.z;
+  double qw = odom_msg->pose.pose.orientation.w;
+
+
+  ROS_INFO("Poisition(x,y,z): %f, %f, %f\n ", x,y,z);
+
+  ROS_INFO("Quaternion: %f, %f, %f, %f\n",qx,qy,qz,qw);
+  ROS_INFO("Approx Angle: %f\n\n\n",2*acos(qw));
+
+
+  pthread_mutex_lock(&position_lock);
+  cur_point.x = x;
+  cur_point.y = y;
+  cur_point.z = z;
+
+  cur_orientation = 2*acos(qw);
+  pthread_mutex_unlock(&position_lock);
+
+}//slam_odomo_cb
+
+
+
+
+
+double SimpleGridMotionLocalization::get_desired_orientation(Point goal_point)
+{
+  return acos(abs(cur_point.x - goal_point.x)/cur_point.distance_to_2d(goal_point));
+}//get_desired orientastion
+
+
+bool SimpleGridMotionLocalization::is_at_point(Point goal_point)
+{
+
+  ROS_INFO("cx: %f gx: %f", cur_point.x, goal_point.x);
+
+  return cur_point.distance_to_2d(goal_point)*METERS_TO_MILLIMETERS <  DISTANCE_TO_POINT_THRESHOLD_MM;
+
+}//is_at_point
 
 
 
@@ -156,9 +219,13 @@ int main(int argc, char **argv){
 
   ros::init(argc, argv, "controller");
 
-  SimpleGridMotionLocalization sgm = SimpleGridMotionLocalization();
-  sgm.run();
-
+//  ros::AsyncSpinner spinner(2); // Use 4 threads
+//  spinner.start();
+  SimpleGridMotionLocalization sgml = SimpleGridMotionLocalization();
+  sgml.run();
+//  while(ros::ok())
+ //   ros::spinOnce();  
+  ros::shutdown();
   return 0;
 
 }//end main

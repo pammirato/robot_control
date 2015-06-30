@@ -142,7 +142,7 @@ endif()
 ## Declare a cpp executable
 # add_executable(robot_control_node src/robot_control_node.cpp)
 
-add_executable(keyboard_control src/keyboard_control.cpp)
+add_executable(keyboard_control src/keyboard_control.cpp src/aria_robot_control.cpp)
 target_link_libraries(keyboard_control
    ${catkin_LIBRARIES}
    ${CURSES_LIBRARIES}
@@ -158,15 +158,15 @@ target_link_libraries(grid_map_control
 
 
 
-add_executable(simple_grid_motion src/simple_grid_motion.cpp src/aria_robot_control.cpp)
-target_link_libraries(simple_grid_motion
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
+#add_executable(simple_grid_motion src/simple_grid_motion.cpp src/aria_robot_control.cpp)
+#target_link_libraries(simple_grid_motion
+#   ${catkin_LIBRARIES}
+#   ${CURSES_LIBRARIES}
+# )
 
 
 
-add_executable(simple_grid_motion_localization src/simple_grid_motion_localization.cpp src/aria_robot_control.cpp src/point.cpp)
+add_executable(simple_grid_motion_localization src/simple_grid_motion_localization.cpp src/aria_robot_control.cpp src/point.cpp src/simple_grid_motion.cpp)
 target_link_libraries(simple_grid_motion_localization
    ${catkin_LIBRARIES}
    ${CURSES_LIBRARIES}

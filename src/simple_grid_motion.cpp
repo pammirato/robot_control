@@ -5,7 +5,42 @@
 
 SimpleGridMotion::SimpleGridMotion()
 {
-  initialize();
+  //conotrols the robot
+  robot = AriaRobotControl();
+
+  //defaults
+  grid_width = .5; 
+  grid_height = .5; 
+  grid_res = .5;
+  turn_res = 45;
+  turn_offset = .1;
+
+  kinect_base_name_1 = DEFAULT_KINECT_BASE_NAME;
+  kinect_base_name_2 = "";
+
+
+  nh = ros::NodeHandle("~");
+
+
+
+
+  //set parameters from command line
+  nh.getParam("grid_width", grid_width);
+  nh.getParam("grid_height", grid_height);
+  nh.getParam("grid_res", grid_res);
+  nh.getParam("turn_res", turn_res);
+  nh.getParam("turn_offset", turn_offset);
+  nh.getParam("base_name_1",kinect_base_name_1);
+  nh.getParam("base_name_2",kinect_base_name_2);
+   
+
+
+
+  ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f TO:%f", grid_width, grid_height, grid_res, turn_res, turn_offset);
+ 
+  save_client_1 = nh.serviceClient<std_srvs::Empty>("/" + kinect_base_name_1 + "/save_images"); 
+  save_client_2 = nh.serviceClient<std_srvs::Empty>("/" + kinect_base_name_2 + "/save_images"); 
+
 }
 
 
@@ -16,6 +51,7 @@ SimpleGridMotion::SimpleGridMotion()
 int SimpleGridMotion::run()
 {
 
+  ROS_INFO("RUNNING BASIC");
 
 
   bool left = true;//whether to go left or right
@@ -40,23 +76,24 @@ int SimpleGridMotion::run()
     //360, then go to next grid point
     for(int i=0;i<num_cols;i++)
     {
-      robot.do_rotation(361, turn_res,true,true);
-      robot.do_rotation(361, 90,false);
+      rotate(360, turn_res,true,true);
+      rotate(360, turn_res,false,false);
       ROS_INFO("ROT 2 DONE");
       robot.do_translation(trans_dist*METERS_TO_MILLIMETERS);
     }//end for i 
 
 
     //360
-    robot.do_rotation(361, turn_res,true, true);
-    robot.do_rotation(361, 90,false);
+    rotate(360, turn_res,true, true);
+    rotate(360, turn_res,false,false);
 
     //go to next row in grid
-    robot.do_rotation(90,90,true);
+    rotate(90,turn_res,true,false);
     robot.do_translation(end_dist*METERS_TO_MILLIMETERS);
-    robot.do_rotation(90,90,false);
+    rotate(90,turn_res,false,false);
 
-
+    //go in the other direction
+    left = !left;
 
     num_rows_done++;
   }//end while num_rows_done 
@@ -67,47 +104,46 @@ int SimpleGridMotion::run()
 
 
 
-//initialize the ros node and paramterrs
-bool SimpleGridMotion::initialize()
+
+
+
+void SimpleGridMotion::rotate(double total_degrees, double turn_res, bool ccw, bool save_images)
 {
+  int num_turns = total_degrees/turn_res;
+  for(int i=0; i<num_turns; i++)
+  {
+    robot.do_rotation(turn_res, turn_res,ccw);
+    if(save_images)
+    {
+      robot.wait_until_stopped(ros::Duration(.5));
+      save_client_1.call(save_images_srv); 
+      save_client_2.call(save_images_srv); 
+    }
+  }//for i 
 
-  //conotrols the robot
-  robot = AriaRobotControl();
 
-  //defaults
-  grid_width = 1;  
-  grid_height = 1;
-  grid_res = .5;
-  turn_res = 45;
-  turn_offset = .1;
-  nh = ros::NodeHandle("~");
-
-  //set parameters from command line
-  nh.getParam("grid_width", grid_width);
-  nh.getParam("grid_height", grid_height);
-  nh.getParam("grid_res", grid_res);
-  nh.getParam("turn_res", turn_res);
-  nh.getParam("turn_offset", turn_offset);
-  ROS_INFO("PARAMS W:%f  H:%f GR:%f TR:%f TO:%f", grid_width, grid_height, grid_res, turn_res, turn_offset);
- 
-  save_client = nh.serviceClient<std_srvs::Empty>("save_images"); 
-
-  return true;
-}//end initialize
+}//rotate
 
 
 
 
 
 
-int main(int argc, char **argv){
+
+
+
+
+
+
+/*int main(int argc, char **argv){
 
 
   ros::init(argc, argv, "controller");
 
   SimpleGridMotion sgm = SimpleGridMotion();
   sgm.run();
-
+  ros::shutdown();
   return 0;
 
 }//end main
+*/
