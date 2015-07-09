@@ -150,6 +150,24 @@ int main(int argc, char **argv){
         std::cout << "saved " << saved << std::endl;
         std::cout << "turning CW " << turn_res << std::endl;
         break;
+      case 'p':
+        std::cout << "MOVING 100mm" << std::endl;
+        robot.do_translation(100);
+        ros::Duration(5).sleep(); 
+        std::cout << "MOVING 200mm" << std::endl;
+        robot.do_translation(200);
+        ros::Duration(5).sleep(); 
+        std::cout << "MOVING 300mm" << std::endl;
+        robot.do_translation(300);
+        ros::Duration(5).sleep(); 
+        std::cout << "MOVING 400mm" << std::endl;
+        robot.do_translation(400);
+        ros::Duration(5).sleep(); 
+        std::cout << "MOVING 500mm" << std::endl;
+        robot.do_translation(500);
+        ros::Duration(5).sleep(); 
+        publish = false;
+        break;
       case '1':
         saved = save_images_client1.call(save_images_srv);
         std::cout << "saved " << saved << std::endl;

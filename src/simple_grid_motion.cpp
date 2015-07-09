@@ -12,7 +12,10 @@ SimpleGridMotion::SimpleGridMotion()
   grid_width = .5; 
   grid_height = .5; 
   grid_res = .5;
-  turn_res = 45;
+  turn_res = 15;
+  trans_res = 500;
+
+
   turn_offset = .1;
 
   kinect_base_name_1 = DEFAULT_KINECT_BASE_NAME;
@@ -29,6 +32,7 @@ SimpleGridMotion::SimpleGridMotion()
   nh.getParam("grid_height", grid_height);
   nh.getParam("grid_res", grid_res);
   nh.getParam("turn_res", turn_res);
+  nh.getParam("trans_res", trans_res);
   nh.getParam("turn_offset", turn_offset);
   nh.getParam("base_name_1",kinect_base_name_1);
   nh.getParam("base_name_2",kinect_base_name_2);
@@ -107,7 +111,7 @@ int SimpleGridMotion::run()
 
 
 
-void SimpleGridMotion::rotate(double total_degrees, double turn_res, bool ccw, bool save_images)
+void SimpleGridMotion::rotate(double total_degrees, double turn_res, bool ccw, bool save_images, double wait_time)
 {
   int num_turns = total_degrees/turn_res;
   for(int i=0; i<num_turns; i++)
@@ -119,6 +123,7 @@ void SimpleGridMotion::rotate(double total_degrees, double turn_res, bool ccw, b
       save_client_1.call(save_images_srv); 
       save_client_2.call(save_images_srv); 
     }
+    ros::Duration(wait_time).sleep();
   }//for i 
 
 

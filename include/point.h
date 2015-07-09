@@ -35,7 +35,7 @@ class Point{
 */
 
     Point();
-    Point(int ix, int iy, int iz, PointState is);
+    Point(double ix, double iy, double iz, PointState is);
 
     double distance_to(Point p);
     double distance_to_2d(Point p);

@@ -32,7 +32,11 @@ class SimpleGridMotion
     double grid_height;
     double grid_res;//resolution, distance between cells
     double turn_res;//how much to turn before taking the next pic     
+    double trans_res;
+
     double turn_offset;//make up for not quite inplace turning
+
+
 
     std::string kinect_base_name_1;
     std::string kinect_base_name_2;
@@ -46,7 +50,7 @@ class SimpleGridMotion
     std_srvs::Empty save_images_srv;   
 
     //functions
-    void rotate(double total_degrees, double turn_res, bool ccw, bool save_images);
+    void rotate(double total_degrees, double turn_res, bool ccw, bool save_images, double wait_time=0);
 
    public:
     SimpleGridMotion();

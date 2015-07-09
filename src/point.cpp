@@ -5,7 +5,7 @@ Point::Point()
   Point(0,0,0,UNEXPLORED);
 }
 
-Point::Point(int ix=0, int iy=0, int iz=0, PointState is=UNEXPLORED)
+Point::Point(double ix=0, double iy=0, double iz=0, PointState is=UNEXPLORED)
 {
   x = ix;
   y = iy;
