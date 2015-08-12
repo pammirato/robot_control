@@ -137,7 +137,8 @@ int main(int argc, char **argv){
         std::cout << "turning CW" << std::endl;
         break;
       case 'r':
-        robot.do_rotation(turn_res,turn_res,true,false); 
+        robot.do_rotation(turn_res,turn_res,true,false);
+        ros::Duration(.5).sleep(); 
         saved = save_images_client1.call(save_images_srv);
         std::cout << "saved " << saved << std::endl;
         publish = false;//dont publish a velocity command
@@ -145,6 +146,7 @@ int main(int argc, char **argv){
         break;
       case 't':
         robot.do_rotation(turn_res,turn_res,false,false); 
+        ros::Duration(.5).sleep(); 
         publish = false;
         saved = save_images_client1.call(save_images_srv);
         std::cout << "saved " << saved << std::endl;

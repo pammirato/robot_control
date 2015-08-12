@@ -40,12 +40,13 @@ class SimpleGridMotion
 
     std::string kinect_base_name_1;
     std::string kinect_base_name_2;
-
+    std::string kinect_base_name_3;
 
     
     ros::NodeHandle nh;
     ros::ServiceClient save_client_1;    
     ros::ServiceClient save_client_2; 
+    ros::ServiceClient save_client_3; 
 
     std_srvs::Empty save_images_srv;   
 

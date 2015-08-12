@@ -33,6 +33,7 @@ class SimpleGridMotionLocalization : SimpleGridMotion
   protected:
     bool debug;
 
+    bool max_rotate_180;
     double slam_turn_res;
     std::string filename;
 //    Point ** goal_points;

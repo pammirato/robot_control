@@ -7,10 +7,13 @@ SimpleGridMotionLocalization::SimpleGridMotionLocalization()
 {
   debug = true;
 
+  max_rotate_180 = true;
   slam_turn_res = 15;
   filename = "";
+
   nh.getParam("slam_turn_res", slam_turn_res);
   nh.getParam("filename", filename);
+  nh.getParam("max_rotate_180", max_rotate_180);
 
   trans_forward = true;
   turn_ccw = true;
@@ -113,7 +116,6 @@ int SimpleGridMotionLocalization::run()
  // for(unsigned int i=0;i<goal_points.size(); i++)
   while(ros::ok())
   {
-   // ros::spinOnce();  
 
     if(planning_active)
     {
@@ -129,7 +131,7 @@ int SimpleGridMotionLocalization::run()
       int counter = 0;
 
       ///KEEP TRYING TO GET TO CURRENT GOAL POINT
-      while(!is_at_point(goal_point) && counter < 10)
+      while(!is_at_point(goal_point) && counter < 1000)
       {
 
         ROS_ERROR("not at point: %f, %f", goal_point.x,goal_point.y);
@@ -148,6 +150,34 @@ int SimpleGridMotionLocalization::run()
 
         double orientation_diff = desired_orientation - cur_orientation;
 
+
+        //##############################
+        //maybe move forwards/backwards
+        trans_forward = true;
+       
+        //ASSUMES ROBOT IS AT 0 degrees orientation 
+        if(fabs(orientation_diff) > (.5 * M_PI))
+        {
+
+          double new_diff = M_PI - fabs(orientation_diff) ;
+         
+          if(orientation_diff > 0)
+          {
+            new_diff = -new_diff;
+          }
+          orientation_diff = new_diff;
+          trans_forward = false;
+          
+          if(debug)
+          { 
+            ROS_INFO("DIFF < 90, move backwards: %f", orientation_diff);
+          }
+        }//if diff > 90
+
+
+
+
+
         //##############################
         //decide if the angle is big enough to warrant turning to face goal
         if(!(fabs(orientation_diff) < ORIENTATION_THRESHOLD_RADIANS))
@@ -160,14 +190,6 @@ int SimpleGridMotionLocalization::run()
 
 
 
-        //##############################
-        //maybe move forwards/backwards
-        
-        trans_forward = true;
-        //if(cur_point.y > goal_point.y)
-       // {
-        //  trans_forward = false;
-       // }
 
         //find distance to goal point
         double dist = cur_point.distance_to_2d(goal_point);  
@@ -181,21 +203,61 @@ int SimpleGridMotionLocalization::run()
         //give the slam a bit to catch up
         robot.wait_until_stopped(.5);
         ros::Duration(1).sleep();
+
+
+        //get the new position from slam
+        update_current_position();
+
+        //reset orientation to 0
+        change_orientation(-cur_orientation);
  
+        
+
+        //give the slam a bit to catch up
+        robot.wait_until_stopped(.5);
+        ros::Duration(1).sleep();
         //get the new position from slam
         update_current_position();
 
         counter++;
-      }//while  
+      }//while not at goal point 
+
+
+
+
+
+
+
+     
+      robot.wait_until_stopped(.5);
+      //get the new position from slam
+      update_current_position();
+
+
 
 
       //now we are at the desired point,take the pictures 
       slam_pause_client.call(empty_srv);
 
-      rotate(360, turn_res,true,true,.5);//take and save data
-      rotate(360,45,false,false);//turn back around
-      robot.wait_until_stopped(.5);
+      if(max_rotate_180)
+      {
+        ROS_INFO("MAX ROTATE 180");
+        rotate(180, turn_res,true,true,2);//take and save data
+        rotate(180,45,false,false);//turn back around
 
+        rotate(180,45,false,false);//turn back around
+        rotate(180, turn_res,true,true,2);//take and save data
+      }//if rotate 180 at a time
+      else
+      {
+        rotate(360, turn_res,true,true,.5);//take and save data
+        rotate(360,45,false,false);//turn back around
+      }     
+
+
+ 
+      robot.wait_until_stopped(.5);
+      ros::Duration(4).sleep();
       slam_resume_client.call(empty_srv);
 
 
@@ -238,10 +300,10 @@ double SimpleGridMotionLocalization::get_desired_orientation(Point goal_point)
 
   double g_size = sqrt(gx*gx + gy*gy);
   
-  double theta = acos(gx/g_size);//will be <90   
+  double theta = acos(fabs(gx/g_size));//will be <90   
   if(gx < 0)
   {
-    theta+= (.5 * M_PI);//add 90 degrees(in radians)
+    theta = M_PI - theta;//add 90 degrees(in radians)
   }  
 
   if(gy <0)
@@ -336,8 +398,8 @@ void SimpleGridMotionLocalization::change_orientation(double amount_to_change)
   int leftover = angle - subtotal;//amount left to turn < slam_turn_res
 
   ROS_INFO("ANGLE: %f, NUM_ROTS: %d, SUBTOTAL: %d, Leftover:%d", angle, num_rots,subtotal,leftover); 
-  rotate(subtotal,slam_turn_res, ccw, false, .5);
-  rotate(leftover, leftover,ccw, false);
+  rotate(subtotal,slam_turn_res, ccw, false, 4);
+  rotate(leftover,leftover,      ccw, false, 4);
 
 
 }//change_orientation
@@ -369,12 +431,12 @@ void SimpleGridMotionLocalization::slam_move(double dist, bool forward)
   for (int j=0; j<num_trans; j++)
   {
     robot.do_translation(trans_res);
-    ros::Duration(3).sleep();
+    ros::Duration(6).sleep();
     robot.wait_until_stopped(.5);
   }//for j
 
   robot.do_translation(leftover);
-  ros::Duration(3).sleep();
+  ros::Duration(6).sleep();
   robot.wait_until_stopped(.5);
 
   if(!forward)

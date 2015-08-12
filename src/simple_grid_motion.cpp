@@ -20,6 +20,7 @@ SimpleGridMotion::SimpleGridMotion()
 
   kinect_base_name_1 = DEFAULT_KINECT_BASE_NAME;
   kinect_base_name_2 = "";
+  kinect_base_name_3 = "";
 
 
   nh = ros::NodeHandle("~");
@@ -36,6 +37,7 @@ SimpleGridMotion::SimpleGridMotion()
   nh.getParam("turn_offset", turn_offset);
   nh.getParam("base_name_1",kinect_base_name_1);
   nh.getParam("base_name_2",kinect_base_name_2);
+  nh.getParam("base_name_3",kinect_base_name_3);
    
 
 
@@ -44,8 +46,9 @@ SimpleGridMotion::SimpleGridMotion()
  
   save_client_1 = nh.serviceClient<std_srvs::Empty>("/" + kinect_base_name_1 + "/save_images"); 
   save_client_2 = nh.serviceClient<std_srvs::Empty>("/" + kinect_base_name_2 + "/save_images"); 
+  save_client_3 = nh.serviceClient<std_srvs::Empty>("/" + kinect_base_name_3 + "/save_images"); 
 
-}
+}//contructor
 
 
 
@@ -117,13 +120,20 @@ void SimpleGridMotion::rotate(double total_degrees, double turn_res, bool ccw, b
   for(int i=0; i<num_turns; i++)
   {
     robot.do_rotation(turn_res, turn_res,ccw);
+    robot.wait_until_stopped(ros::Duration(wait_time));
+    ros::Duration(wait_time).sleep();
     if(save_images)
     {
-      robot.wait_until_stopped(ros::Duration(.5));
-      save_client_1.call(save_images_srv); 
+      robot.wait_until_stopped(ros::Duration(wait_time));
+      ros::Duration(wait_time).sleep();
+      if(!save_client_1.call(save_images_srv))
+      {
+        ROS_ERROR("FAILED SAVE SERVICE CALL %s", kinect_base_name_1.c_str());
+      } 
       save_client_2.call(save_images_srv); 
+      save_client_3.call(save_images_srv); 
     }
-    ros::Duration(wait_time).sleep();
+    //ros::Duration(wait_time).sleep();
   }//for i 
 
 
