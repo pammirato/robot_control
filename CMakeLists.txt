@@ -172,6 +172,12 @@ target_link_libraries(simple_grid_motion_localization
    ${CURSES_LIBRARIES}
  )
 
+add_executable(simple_grid_motion_service src/simple_grid_motion_service.cpp src/aria_robot_control.cpp src/point.cpp src/simple_grid_motion.cpp)
+target_link_libraries(simple_grid_motion_service
+   ${catkin_LIBRARIES}
+   ${CURSES_LIBRARIES}
+ )
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes

@@ -17,6 +17,10 @@ AriaRobotControl::AriaRobotControl()
   save_images_client = nh.serviceClient<std_srvs::Empty>("/save_images");
 
 
+
+  cmd_vel_pub = nh.advertise<geometry_msgs::Twist>("/RosAria/cmd_vel",10);
+  cmd_vel_message = geometry_msgs::Twist();
+
   //how long to wait for robot to stop moving
   trans_wait = ros::Duration(WAIT_TO_MOVE_TIME);
   turn_wait = ros::Duration(WAIT_TO_TURN_TIME);
@@ -70,7 +74,6 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
 {
   step_size = abs(step_size);
   int num_turns = total_degrees/step_size;//total turns to do 
-   
   int count = 0;//current num of turns executed
  
   if(!ccw)
@@ -82,6 +85,7 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
   {
     if(save_images)
     {
+      ROS_ERROR("SAVE DO ROT");
       if(!wait_until_stopped(turn_wait))
       { 
         ROS_ERROR("FAILED SAVE"); 
@@ -98,16 +102,14 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
     }
     else
     {
-      ros::Duration(.5).sleep();//just for extra saftey
-      turn(step_size);  
+      //ros::Duration(.5).sleep();//just for extra saftey
+      turn(step_size,.1);  
       count++;
     }
   }
 
   return true;
 }//end do_rotation
-
-
 
 //GIVES TURN COMMNAD IMMEADITELY
 bool AriaRobotControl::turn(double degrees)
@@ -120,6 +122,27 @@ bool AriaRobotControl::turn(double degrees)
   }
   return true;
 }//end turn
+
+
+
+
+//turn at a certain speed
+bool AriaRobotControl::turn(double degrees, double max_velocity)
+{
+  double seconds = ((degrees * M_PI) / 180)/max_velocity;
+  
+  cmd_vel_message.angular.z = max_velocity;
+  cmd_vel_pub.publish(cmd_vel_message);
+  
+  ros::Duration(seconds).sleep();
+
+  cmd_vel_message.angular.z = 0;
+  cmd_vel_pub.publish(cmd_vel_message);
+
+  return true;
+}//end turn
+
+
 
 
 

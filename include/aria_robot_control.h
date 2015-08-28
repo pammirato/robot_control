@@ -36,7 +36,8 @@ class AriaRobotControl
     ros::ServiceClient enable_motors_client;
     ros::ServiceClient save_images_client;
 
-
+    ros::Publisher cmd_vel_pub;
+    geometry_msgs::Twist cmd_vel_message;
 
     rosaria::get_state get_state_srv; 
     rosaria::float_message float_srv; 
@@ -58,7 +59,8 @@ class AriaRobotControl
     bool wait_until_stopped(ros::Duration wait, int max_iterations=100);
     bool wait_until_stopped(double seconds, int max_iterations=100);
     bool do_rotation(double total_degrees, double step_size, bool cw, bool save_images=false);
-    bool turn(double degrees);
+    bool turn(double degrees); 
+    bool turn(double degrees, double max_velocity);
     bool do_translation(double millimeters);
 
     int run();

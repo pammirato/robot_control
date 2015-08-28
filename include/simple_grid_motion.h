@@ -37,6 +37,7 @@ class SimpleGridMotion
     double turn_offset;//make up for not quite inplace turning
 
 
+    double max_rotation;//how much to roatate at each point(usually 360)
 
     std::string kinect_base_name_1;
     std::string kinect_base_name_2;
