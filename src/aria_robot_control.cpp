@@ -75,27 +75,17 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
   step_size = abs(step_size);
   int num_turns = total_degrees/step_size;//total turns to do 
   int count = 0;//current num of turns executed
+  double max_speed = .1;
+
  
   if(!ccw)
   {
     step_size = -step_size;
+    max_speed = -max_speed;
   } 
 
   while(count < num_turns)
   {
-    if(save_images)
-    {
-      ROS_ERROR("SAVE DO ROT");
-      if(!wait_until_stopped(turn_wait))
-      { 
-        ROS_ERROR("FAILED SAVE"); 
-      }
-      
-      if(!save_images_client.call(save_images_srv))
-      {
-        ROS_ERROR("FAILED SAVE"); 
-      }
-    }
     if(!wait_until_stopped(turn_wait))
     { 
       return false;
@@ -103,7 +93,14 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
     else
     {
       //ros::Duration(.5).sleep();//just for extra saftey
-      turn(step_size,.1);  
+      if(!save_images)
+      {
+        turn(step_size);
+      }
+      else
+      {
+        turn(step_size,.1);  
+      }
       count++;
     }
   }

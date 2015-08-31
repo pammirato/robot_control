@@ -136,6 +136,8 @@ int SimpleGridMotionService::run()
 
       Point goal_point = goal_points[i];
       int counter = 0;
+      bool at_desired_orientation = false;
+
 
       ///KEEP TRYING TO GET TO CURRENT GOAL POINT
       while(!is_at_point(goal_point) && counter < 1000)
@@ -143,59 +145,68 @@ int SimpleGridMotionService::run()
 
         ROS_ERROR("not at point: %f, %f", goal_point.x,goal_point.y);
 
-
-        //##############################
-        double desired_orientation = get_desired_orientation(goal_point);
-
-        if(debug)
-        {
-          std::cerr << "CurOrientation: " << 
-              std::to_string(cur_orientation) << "  DesiredOrientation:"
-              << std::to_string(desired_orientation) << std::endl;
-          ros::Duration(3).sleep();
-        }
-
-
-        double orientation_diff = desired_orientation - cur_orientation;
-
-
-        //##############################
-        //maybe move forwards/backwards
-        trans_forward = true;
-       
-        //ASSUMES ROBOT IS AT 0 degrees orientation 
-        if(fabs(orientation_diff) > (.5 * M_PI))
+        while(!at_desired_orientation)
         {
 
-          double new_diff = M_PI - fabs(orientation_diff) ;
-         
-          if(orientation_diff > 0)
-          {
-            new_diff = -new_diff;
-          }
-          orientation_diff = new_diff;
-          trans_forward = false;
-          
+          //##############################
+          double desired_orientation = get_desired_orientation(goal_point);
+
           if(debug)
-          { 
-            std::cerr << "DIFF < 90, move backwards: " 
-            << std::to_string(orientation_diff) << std::endl;
+          {
+            std::cerr << "CurOrientation: " << 
+                std::to_string(cur_orientation) << "  DesiredOrientation:"
+                << std::to_string(desired_orientation) << std::endl;
+            ros::Duration(3).sleep();
           }
-        }//if diff > 90
+
+
+          double orientation_diff = desired_orientation - cur_orientation;
+
+
+          //##############################
+          //maybe move forwards/backwards
+          trans_forward = true;
+         
+          //ASSUMES ROBOT IS AT 0 degrees orientation 
+          if(fabs(orientation_diff) > (.5 * M_PI))
+          {
+
+            double new_diff = M_PI - fabs(orientation_diff) ;
+           
+            if(orientation_diff > 0)
+            {
+              new_diff = -new_diff;
+            }
+            orientation_diff = new_diff;
+            trans_forward = false;
+            
+            if(debug)
+            { 
+              std::cerr << "DIFF < 90, move backwards: " 
+              << std::to_string(orientation_diff) << std::endl;
+            }
+          }//if diff > 90
 
 
 
 
 
-        //##############################
-        //decide if the angle is big enough to warrant turning to face goal
-        if(!(fabs(orientation_diff) < ORIENTATION_THRESHOLD_RADIANS))
-        {
-          //turn in increments so slam can keep up
-          change_orientation(orientation_diff);
-        }//if oreintation 
+          //##############################
+          //decide if the angle is big enough to warrant turning to face goal
+          if(!(fabs(orientation_diff) < ORIENTATION_THRESHOLD_RADIANS))
+          {
+            //turn in increments so slam can keep up
+            change_orientation(orientation_diff);
+          }//if oreintation 
+          else
+          {
+            at_desired_orientation = true;
+          }
 
+          ros::Duration(.5).sleep();
+          update_current_position();
 
+        }//while not at current orientation
 
 
 
@@ -424,8 +435,8 @@ void SimpleGridMotionService::change_orientation(double amount_to_change)
   int leftover = angle - subtotal;//amount left to turn < slam_turn_res
 
   fprintf(stderr, "ANGLE: %f, NUM_ROTS: %d, SUBTOTAL: %d, Leftover:%d", angle, num_rots,subtotal,leftover); 
-  rotate(subtotal,slam_turn_res, ccw, false, 1);
-  rotate(leftover,leftover,      ccw, false, 1);
+  rotate(subtotal,slam_turn_res, ccw, false, 2);
+  rotate(leftover,leftover,      ccw, false, 2);
 
 
 }//change_orientation

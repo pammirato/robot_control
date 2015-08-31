@@ -124,7 +124,8 @@ void SimpleGridMotion::rotate(double total_degrees, double turn_res, bool ccw, b
   for(int i=0; i<num_turns; i++)
   {
     
-    robot.do_rotation(turn_res, turn_res,ccw, false);
+    robot.wait_until_stopped(ros::Duration(.2));
+    robot.do_rotation(turn_res, turn_res,ccw, save_images);
     robot.wait_until_stopped(ros::Duration(wait_time));
     //ros::Duration(wait_time).sleep();
     if(save_images)
