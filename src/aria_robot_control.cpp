@@ -99,7 +99,7 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
       }
       else
       {
-        turn(step_size,.1);  
+        turn(step_size,.15);  
       }
       count++;
     }
