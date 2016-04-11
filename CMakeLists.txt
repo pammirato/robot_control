@@ -142,8 +142,8 @@ endif()
 ## Declare a cpp executable
 # add_executable(robot_control_node src/robot_control_node.cpp)
 
-add_executable(keyboard_control src/keyboard_control.cpp src/aria_robot_control.cpp)
-target_link_libraries(keyboard_control
+add_executable(keyboard_controller src/keyboard_controller.cpp src/aria_robot_control.cpp)
+target_link_libraries(keyboard_controller
    ${catkin_LIBRARIES}
    ${CURSES_LIBRARIES}
  )

@@ -3,7 +3,7 @@
 #include "std_srvs/Empty.h"
 #include <rtabmap_ros/GetOdom.h>
 #include <nav_msgs/Odometry.h>
-
+#include "rosaria/float_message.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -49,22 +49,37 @@ std::mutex slam_odom_lock;
 double cur_orientation = -1;
 
 
+//conotrols the robot
+//AriaRobotControl robot = AriaRobotControl();
+
+
+void turn(AriaRobotControl robot, double degrees)
+{
+  std::cout << "kye turn" <<std::endl;
+  robot.turn(degrees);
+
+}//end turn 
 
 
 
 
 
 
-
-
-void rotate(AriaRobotControl robot, ros::ServiceClient save_client_1,
+void rotate(ros::ServiceClient save_client_1,
          ros::ServiceClient save_client_2,ros::ServiceClient save_client_3,
          double total_degrees, double turn_res, bool ccw, bool save_images,
-          double wait_time)
+          double wait_time, rosaria::float_message save_images_srv, int num_kinects,
+          ros::Publisher control_pub, geometry_msgs::Twist message )
+   
 {
 
-  std_srvs::Empty save_images_srv;
+//  std_srvs::Empty save_images_srv;
 
+/*  double step_size = turn_res;
+  if(!ccw)
+  {
+    step_size = -step_size;
+  }
   int num_turns = total_degrees/turn_res;
 
   double leftover = total_degrees - (num_turns * turn_res);
@@ -75,10 +90,16 @@ void rotate(AriaRobotControl robot, ros::ServiceClient save_client_1,
     double time_spent;
 
     begin = clock(); 
-    
+   
+    std::cout << "KEY  ROTATE STEP: " << step_size << std::endl; 
     robot.wait_until_stopped(ros::Duration(.2));
-    robot.do_rotation(turn_res, turn_res,ccw, save_images);
-    robot.wait_until_stopped(ros::Duration(wait_time));
+    //robot.do_rotation(turn_res, turn_res,ccw, save_images);
+    robot.turn(step_size);    
+    
+    //robot.wait_until_stopped(ros::Duration(wait_time));
+    message.linear.x = 0;
+    message.angular.z = 0;
+    control_pub.publish(message);
     //ros::Duration(wait_time).sleep();
     if(save_images)
     {
@@ -86,18 +107,18 @@ void rotate(AriaRobotControl robot, ros::ServiceClient save_client_1,
       time_spent = ((double)(end) - (double)(begin)) / (double)CLOCKS_PER_SEC;
       //std::cerr << "time rotate: "<< patch::to_string(time_spent) << std::endl;
 
-      std::cerr << "ROTATE: " << std::endl;
+      std::cerr << "ROTATE time: " << std::endl;
       std::cerr << time_spent << std::endl;
       begin = clock(); 
 //    robot.wait_until_stopped(ros::Duration(wait_time));
       ros::Duration(.1).sleep();
       if(!save_client_1.call(save_images_srv))
       { ROS_ERROR("FAILED SAVE SERVICE CALL K1"); }
-      if(!save_client_2.call(save_images_srv))
+      if(num_kinects > 1 && !save_client_2.call(save_images_srv))
       {
         ROS_ERROR("FAILED SAVE SERVICE CALL K2");
       }
-      if(!save_client_3.call(save_images_srv))
+      if(!num_kinects > 2 && save_client_3.call(save_images_srv))
       {
         ROS_ERROR("FAILED SAVE SERVICE CALL K3");
       }
@@ -116,8 +137,16 @@ void rotate(AriaRobotControl robot, ros::ServiceClient save_client_1,
   {
 
     robot.wait_until_stopped(ros::Duration(.2));
-    robot.do_rotation(leftover, leftover,ccw, save_images);
-    robot.wait_until_stopped(ros::Duration(wait_time));
+    //robot.do_rotation(leftover, leftover,ccw, save_images);
+    if(!ccw)
+    {
+      leftover = -leftover;
+    }
+    robot.turn(leftover);
+    //robot.wait_until_stopped(ros::Duration(wait_time));
+    message.linear.x = 0;
+    message.angular.z = 0;
+    control_pub.publish(message);
     //ros::Duration(wait_time).sleep();
     if(save_images)
     {
@@ -136,7 +165,7 @@ void rotate(AriaRobotControl robot, ros::ServiceClient save_client_1,
     }
 
   }
-
+*/
 
 }//rotate
 
@@ -237,11 +266,12 @@ int main(int argc, char **argv){
 
   int publish_buffer_size = 10;
 
-  std::string save_1 = "/K1_save_data/save_service";
+  std::string save_1 = "/kinect2_saver/save_service";
   std::string save_2 = "/K2/save_data";
   std::string save_3 = "/K3_save_data/save_service";
-  double turn_res = 15.0;
+  double turn_res = 30;
   double trans_res = .3;
+  double one_way_turn_max = 90;
 
   nh.getParam("base_name_1", save_1);
   nh.getParam("base_name_2", save_2);
@@ -251,14 +281,14 @@ int main(int argc, char **argv){
     
 
   //conotrols the robot
-  AriaRobotControl robot = AriaRobotControl();
+//  AriaRobotControl robot = AriaRobotControl();
+  AriaRobotControl robot = AriaRobotControl(1);
 
   //save kinect data
-  ros::ServiceClient save_client_1 = nh.serviceClient<std_srvs::Empty>(save_1);
-  ros::ServiceClient save_client_2 = nh.serviceClient<std_srvs::Empty>(save_2);
-  ros::ServiceClient save_client_3 = nh.serviceClient<std_srvs::Empty>(save_3);
-  std_srvs::Empty save_images_srv;
-
+  ros::ServiceClient save_client_1 = nh.serviceClient<rosaria::float_message>(save_1);
+  ros::ServiceClient save_client_2 = nh.serviceClient<rosaria::float_message>(save_2);
+  ros::ServiceClient save_client_3 = nh.serviceClient<rosaria::float_message>(save_3);
+  rosaria::float_message save_images_srv; 
 
 
 
@@ -297,6 +327,8 @@ int main(int argc, char **argv){
   double linear_step = .1;
   double angular_step = .1;
 
+  double cluster_id = 0;
+
   //the message that will be published to the ROS topic
   geometry_msgs::Twist message = geometry_msgs::Twist();
 
@@ -315,7 +347,7 @@ int main(int argc, char **argv){
  
     switch(c)
     {
-      case 'f': //STOP EVERYTHING 
+      case 'c': //STOP EVERYTHING 
         cur_linear = 0.0;
         cur_angular = 0.0;
         std::cout << "STOPPED" << std::endl;
@@ -338,54 +370,101 @@ int main(int argc, char **argv){
       case 'd': //ROTATE CLOCKWISE
         cur_angular += -angular_step;
         break;
-      case 'e': //ROTATE 180 DEGREES, 90 CCW(saving), 90 CW, 90 CW(saving), 90 CCW 
+      case 'e': //ROTATE 2*one_way_turn_max DEGREES, one_way_turn_max CCW(saving), 90 CW, 90 CW(saving), 90 CCW 
 
 
-        //robot point, save clients (1-3), total_degrees, turn_res, ccw,save,wait_time(per rot)
+        //robot point, save clients (1-3), total_degrees, turn_res, ccw,save,wait_time(per rot), save_images_srv, numkinects, controlpub, message
 
-        //rotate 90 and take pictures
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,turn_res,true,true,1);
+        //rotate one_way_turn_max and take pictures
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,turn_res,true,true,1, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
         // rotate back to original position 
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,45,false,false,0);
-        //rotate 90 the other way
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,45,false,false,0);
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,45,false,false,0, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
+        //rotate one_way_turn_max the other way
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,45,false,false,0, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
         // rotate back to original position and pitcures
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,turn_res,true,true,1);
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,turn_res,true,true,1, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
 
         publish = false;//dont publish a velocity command
 
         ROS_ERROR("DONE WITH CURRENT POINT!");
         break;
-      case 'r'://ROTATE 90 DEGREES, 90 CCW(saving), 90 CW
+      case 'r'://ROTATE one_way_turn_max DEGREES, one_way_turn_max CCW(saving), one_way_turn_max CW
 
-        //rotate 90 and take pictures
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,turn_res,true,true,1);
+
+        turn(robot,30);
+
+        //ros::Duration(2).sleep();
+        //std::cout << "key jsut rturn" << std::endl;
+        //robot.turn(30);
+/*
+        //rotate one_way_turn_max and take pictures
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,turn_res,true,true,1, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
+
+        ROS_INFO("NOW GO BACK");
         // rotate back to original position 
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,45,false,false,0);
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,45,false,false,0, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
 
 
         publish = false;//dont publish a velocity command
         ROS_ERROR("DONE WITH HALF POINT!");
-        break;
-      case 't'://ROTATE 90 DEGREES, 90 CW, 90 CCW(saving)
-        //rotate 90 the other way
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,45,false,false,0);
+  */      break;
+      case 't'://ROTATE one_way_turn_max DEGREES, one_way_turn_max CW, one_way_turn_max CCW(saving)
+        //rotate one_way_turn_max the other way
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,45,false,false,0, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
         // rotate back to original position and pitcures
-        rotate(robot,save_client_1,save_client_2,save_client_3,90,turn_res,true,true,1);
+        rotate(save_client_1,save_client_2,save_client_3,one_way_turn_max,turn_res,true,true,1, save_images_srv, 1, control_pub,message);
+        message.linear.x = 0;
+        message.angular.z = 0;
+        control_pub.publish(message);
 
 
         publish = false;//dont publish a velocity command
 
         ROS_ERROR("DONE WITH HALF  POINT!");
         break;
-      case 'c': //TRANSLATE trans_res METERS
+      case 'g': //TRANSLATE trans_res METERS
         robot.do_translation(trans_res * 1000);
         robot.wait_until_stopped(.1);
 
         publish = false;
         break;
-      case 'v': //TRANSLATE BACKWARD trans_res METERS
+      case 'f': //TRANSLATE BACKWARD trans_res METERS
         robot.do_translation(-trans_res * 1000);
+        robot.wait_until_stopped(.1);
+
+        publish = false;
+        break;
+      case 'v': //ROTATE CCW turn_res DEGREES
+        ROS_ERROR("CHOICE V");
+        robot.turn(-turn_res);
+        robot.wait_until_stopped(.1);
+
+        publish = false;
+        break;
+      case 'b': //ROTATE CCW turn_res DEGREES
+        ROS_ERROR("CHOICE B");
+        robot.turn(turn_res);
         robot.wait_until_stopped(.1);
 
         publish = false;
@@ -429,6 +508,11 @@ int main(int argc, char **argv){
         slam_odom_lock.unlock();
         break;
       
+      case 'y':
+        cluster_id = cluster_id + 1;
+        save_images_srv.request.input = cluster_id;
+        std::cout << "saved " << saved << std::endl;
+        break;
       //save kinect data
       case '1':
         saved = save_client_1.call(save_images_srv);

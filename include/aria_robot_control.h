@@ -35,12 +35,14 @@ class AriaRobotControl
     ros::ServiceClient heading_client;
     ros::ServiceClient enable_motors_client;
     ros::ServiceClient save_images_client;
+    ros::ServiceClient max_speeds_client;
 
     ros::Publisher cmd_vel_pub;
     geometry_msgs::Twist cmd_vel_message;
 
     rosaria::get_state get_state_srv; 
     rosaria::float_message float_srv; 
+    rosaria::float_message max_speeds_srv; 
     std_srvs::Empty enable_motors_srv;
     std_srvs::Empty save_images_srv;
 
@@ -63,6 +65,7 @@ class AriaRobotControl
     bool turn(double degrees, double max_velocity);
     bool do_translation(double millimeters);
 
+    bool set_max_speeds(double max_trans, double max_rot);
     int run();
 
 

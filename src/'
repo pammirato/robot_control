@@ -2,13 +2,14 @@
 
 
 
+
+
 AriaRobotControl::AriaRobotControl() 
 {
    //register client
    get_state_client = nh.serviceClient<rosaria::get_state>("/RosAria/get_state");
   move_client = nh.serviceClient<rosaria::float_message>("/RosAria/move");
   heading_client = nh.serviceClient<rosaria::float_message>("/RosAria/heading");
-  max_speeds_client = nh.serviceClient<rosaria::float_message>("/RosAria/max_speeds");
   
   enable_motors_client  = nh.serviceClient<std_srvs::Empty>("/RosAria/enable_motors");
   enable_motors_client.call(enable_motors_srv); //enable the motors
@@ -38,8 +39,7 @@ bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iteration
   
   //std::cout << "IS STOPPED: " <<  get_state_srv.response.isStopped << std::endl; 
   //wait until the robot has stopped moving to issue a move command
-  while((!(get_state_srv.response.isStopped) || !(get_state_srv.response.isHeadingDone) \
-        || !(get_state_srv.response.isMoveDone)) && count < max_iterations)
+  while(!(get_state_srv.response.isStopped) && count < max_iterations)
   {
     ROS_INFO("ROBOT STILL moving");
     wait.sleep();
@@ -62,7 +62,7 @@ bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iteration
 
 bool AriaRobotControl::wait_until_stopped(double seconds, int  max_iterations)
 {
-  return wait_until_stopped(ros::Duration(seconds), max_iterations);
+  wait_until_stopped(ros::Duration(seconds), max_iterations);
 }
 
 
@@ -75,12 +75,12 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
   step_size = abs(step_size);
   int num_turns = total_degrees/step_size;//total turns to do 
   int count = 0;//current num of turns executed
-  double max_speed = .15;
+  double max_speed = .1;
 
  
   if(!ccw)
   {
-   step_size = -step_size;
+    step_size = -step_size;
     max_speed = -max_speed;
   } 
 
@@ -101,9 +101,8 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
      // {
      //   turn(step_size,.15);  
      // }
-     std::cout << "aria control do_rotate turn step size: " <<  step_size<< std::endl;
-   //  turn(step_size,max_speed);  
-     turn(step_size);  
+     std::cout << "turn step size: " <<  step_size<< std::endl;
+     turn(step_size,.15);  
       count++;
     }
   }
@@ -114,7 +113,7 @@ bool AriaRobotControl::do_rotation(double total_degrees, double step_size,bool c
 //GIVES TURN COMMNAD IMMEADITELY
 bool AriaRobotControl::turn(double degrees)
 {
-  std::cout << "aRAI contril TURN FUNCION degrees: " << degrees << std::endl;
+    ROS_ERROR("ROBOT TURN FUNCION");
   float_srv.request.input = degrees;
   if(!heading_client.call(float_srv))
   { 
@@ -165,15 +164,6 @@ bool AriaRobotControl::do_translation(double millimeters)
 }//end do translation
 
 
-bool AriaRobotControl::set_max_speeds(double max_trans, double max_rot)
-{
-  max_speeds_srv.request.input = max_trans;
-  max_speeds_srv.request.input2 = max_rot;
 
-  if(!max_speeds_client.call(max_speeds_srv))
-  { 
-    return false;
-  } 
 
-  return true;
-}//set_max_speeds
+
