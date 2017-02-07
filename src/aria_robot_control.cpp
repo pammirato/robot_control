@@ -38,8 +38,9 @@ bool AriaRobotControl::wait_until_stopped(ros::Duration wait, int  max_iteration
   
   //std::cout << "IS STOPPED: " <<  get_state_srv.response.isStopped << std::endl; 
   //wait until the robot has stopped moving to issue a move command
-  while((!(get_state_srv.response.isStopped) || !(get_state_srv.response.isHeadingDone) \
+//  while((!(get_state_srv.response.isStopped) || !(get_state_srv.response.isHeadingDone) \
         || !(get_state_srv.response.isMoveDone)) && count < max_iterations)
+  while(!(get_state_srv.response.isStopped)  && (count < max_iterations))
   {
     ROS_INFO("ROBOT STILL moving");
     wait.sleep();

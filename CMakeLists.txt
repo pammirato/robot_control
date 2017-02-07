@@ -150,11 +150,6 @@ target_link_libraries(keyboard_controller
 
 
 
-add_executable(grid_map_control src/grid_map_control.cpp)
-target_link_libraries(grid_map_control
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
 
 
 
@@ -165,18 +160,6 @@ target_link_libraries(grid_map_control
 # )
 
 
-
-add_executable(simple_grid_motion_localization src/simple_grid_motion_localization.cpp src/aria_robot_control.cpp src/point.cpp src/simple_grid_motion.cpp)
-target_link_libraries(simple_grid_motion_localization
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
-
-add_executable(simple_grid_motion_service src/simple_grid_motion_service.cpp src/aria_robot_control.cpp src/point.cpp src/simple_grid_motion.cpp)
-target_link_libraries(simple_grid_motion_service
-   ${catkin_LIBRARIES}
-   ${CURSES_LIBRARIES}
- )
 
 
 ## Add cmake target dependencies of the executable/library

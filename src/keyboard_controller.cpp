@@ -16,7 +16,7 @@
 #include <thread>
 #include <chrono>
 #include <errno.h>
-#include <ncurses.h>
+//#include <ncurses.h>
 #include <time.h>
 
 #include <fstream>
@@ -30,7 +30,7 @@
 
 #include "geometry_msgs/Twist.h"
 #include "std_srvs/Empty.h"
-#include <rtabmap_ros/GetOdom.h>
+//#include <rtabmap_ros/GetOdom.h>
 #include "rosaria/float_message.h"
 
 
@@ -61,10 +61,10 @@ private:
   //SLAM communications
   ros::Subscriber slam_odom_sub;
 
-  ros::ServiceClient slam_pause_client;
-  ros::ServiceClient slam_resume_client;
-  ros::ServiceClient slam_pause_odom_client;
-  ros::ServiceClient slam_resume_odom_client;
+  //ros::ServiceClient slam_pause_client;
+  //ros::ServiceClient slam_resume_client;
+  //ros::ServiceClient slam_pause_odom_client;
+  //ros::ServiceClient slam_resume_odom_client;
   std_srvs::Empty empty_srv; 
 
 
@@ -82,7 +82,6 @@ private:
 
 
   double cur_x, cur_y, cur_z,cur_orientation;
-  double cluster_id;
 //  double goal_x, goal_y, goal_z;
   std::mutex slam_odom_lock;
 
@@ -100,13 +99,14 @@ private:
   double angular_step;
 
 
+  int cluster_id;
 
 
 
 public:
-  Controller(double turn_res, double trans_res, double one_way_turn_max)
+  Controller(double turn_res, double trans_res, double one_way_turn_max, int start_cluster_id)
     : turn_res(turn_res), trans_res(trans_res), one_way_turn_max(one_way_turn_max),
-     nh("~"), cur_x(-1), cur_y(-1), cur_z(-1), cur_orientation(-1), cluster_id(-1),
+     nh("~"), cur_x(-1), cur_y(-1), cur_z(-1), cur_orientation(-1), cluster_id(start_cluster_id),
      cur_linear(0), cur_angular(0), linear_step(.1), angular_step(.1) 
   {
 
@@ -124,10 +124,10 @@ public:
 //  slam_odom_sub = nh.subscribe("/rtabmap/odom",1,boost::bind(&Controller::slam_odom_callback, this, _1));
   //slam_odom_sub = nh.subscribe("/rtabmap/odom",1,&Controller::slam_odom_callback, this);
   slam_odom_sub = nh.subscribe("/RosAria/pose",1,&Controller::rosaria_odom_callback, this);
-  slam_pause_client = nh.serviceClient<std_srvs::Empty>("/rtabmap/pause");
-  slam_resume_client=nh.serviceClient<std_srvs::Empty>("/rtabmap/resume");
-  slam_pause_odom_client = nh.serviceClient<std_srvs::Empty>("/rtabmap/pause_odom");
-  slam_resume_odom_client=nh.serviceClient<std_srvs::Empty>("/rtabmap/resume_odom");
+//  slam_pause_client = nh.serviceClient<std_srvs::Empty>("/rtabmap/pause");
+//  slam_resume_client=nh.serviceClient<std_srvs::Empty>("/rtabmap/resume");
+//  slam_pause_odom_client = nh.serviceClient<std_srvs::Empty>("/rtabmap/pause_odom");
+//  slam_resume_odom_client=nh.serviceClient<std_srvs::Empty>("/rtabmap/resume_odom");
 
  
   publish_buffer_size = 10;
@@ -159,10 +159,10 @@ private:
   {
     std::cout << "start! " << std::endl;
 
-    bool success = 0;
     char c;
     bool quit = false;
-
+    int num_loops = 0;
+    
     ros::Rate loop_rate(10);
 
     while(ros::ok() && !quit)
@@ -217,11 +217,11 @@ private:
         case 'e': //ROTATE COUNTER CLOCKWISE ONE_TURN MAX(half cluster)
         
           rotate(one_way_turn_max,true,true);//rotate and save
-          rotate(one_way_turn_max,false,false);//go back and dont save
+          //rotate(one_way_turn_max,false,false);//go back and dont save
           break;
         case 'r': //ROTATE CLOCKWISE ONE_TURN MAX(half cluster)
           rotate(one_way_turn_max,false,true);//rotate and save
-          rotate(one_way_turn_max,true,false);//go back and dont save
+          //rotate(one_way_turn_max,true,false);//go back and dont save
           break;
         case 't': //ROTATE CLOCKWISE ONE_TURN MAX(half cluster)
           rotate_full_cluster();
@@ -230,13 +230,13 @@ private:
           rotate(turn_res,true,true);//rotate and save
           break;
         case 'b': //ROTATE CLOCKWISE 2*ONE_TURN MAX(one point)
-          rotate(turn_res,false,true);//go back and save
+          rotate(turn_res,false,true);//rotate and save
           break;
         case 'V': //ROTATE COUNTER CLOCKWISE TURN RES (one point) 
-          rotate(turn_res,true,false);//rotate and save
+          rotate(turn_res,true,false);//rotate and dont save
           break;
         case 'B': //ROTATE CLOCKWISE 2*ONE_TURN MAX(one point)
-          rotate(turn_res,false,false);//go back and save
+          rotate(turn_res,false,false);//rotate and dont save
           break;
         case 'h': //ROTATE CLOCKWISE 2*ONE_TURN MAX(one point)
           turn_to_zero();
@@ -246,13 +246,15 @@ private:
         //SINGLE MOVE TRANSLATE COMMANDS
 
         case 'f': //TRANSLATE BACKWARD TRANS_RES
-          increment_cluster_id(1);
+          //break;
+          //increment_cluster_id(1);
           slow_translate(-trans_res);
           break;
         case 'g': //TRANSLATE FORWARD TRANS_RES
-          increment_cluster_id(1);
-          slow_translate(trans_res);
           break;
+          //increment_cluster_id(1);
+          slow_translate(trans_res);
+          //break;
 
 
 
@@ -260,56 +262,108 @@ private:
 
         //COMPOUND COMMANDS
 
-        case 'l': //TRANSLATE FORWARD AND ROTATE FULL CLUSTER 
+        case 'j': //TRANSLATE FORWARD AND ROTATE FULL CLUSTER 
           //move to new spot 
           increment_cluster_id(1);
           slow_translate(trans_res);
           
           //for extra safety
-          robot.wait_until_stopped(.5);
           stop_all(); 
+          robot.wait_until_stopped(.5,5);
    
           rotate_full_cluster();
           break;
-        case 'k':
+        case 'k': //TRANSLATE FORWARD AND ROTATE FULL CLUSTER, REPEAT
+          //get number of times to repeat 
+          scanf(" %i",&num_loops); 
+          
+          //for safety just stop  
+          stop_all(); 
+          robot.wait_until_stopped(.1,5);
+
+          for(int jj = 0; jj<num_loops; jj++)
+          { 
+            increment_cluster_id(1);
+            rotate_full_cluster();
+            
+            robot.wait_until_stopped(.1,5);
+            
+            //move to new spot 
+            slow_translate(trans_res);
+            
+            robot.wait_until_stopped(.5,5);
+            stop_all(); 
+          }//for jj
+            increment_cluster_id(1);
+            rotate_full_cluster();
+            
+          break;
+        case 'l': //TRANSLATE FORWARD AND ROTATE FULL CLUSTER, REPEAT
+          //get number of times to repeat 
+          scanf(" %i",&num_loops); 
+          
+            //move to new spot 
+            slow_translate(trans_res);
+         
+           //for safety just stop  
+          stop_all(); 
+          robot.wait_until_stopped(.1,5);
+
+          for(int jj = 0; jj<num_loops; jj++)
+          { 
+            increment_cluster_id(1);
+            rotate_full_cluster();
+            
+            robot.wait_until_stopped(.1,5);
+            
+            //move to new spot 
+            slow_translate(trans_res);
+            
+            robot.wait_until_stopped(.1,5);
+            stop_all(); 
+          }//for jj
+            increment_cluster_id(1);
+            rotate_full_cluster();
+            
+          break;
+
+
+
+
+
+
+        //DENSITY COMMANDS (PATH COMMANDS)
+        case 'p'://go forward every 2m, stopping every 2cm to take an image, never turn
           increment_cluster_id(1);
           save_images();
-          for(int jj = 0; jj<10; jj++) 
+          for(int jj = 0; jj<100; jj++) 
           {
             increment_cluster_id(1);
-            slow_translate(.1);
+            slow_translate(.02);
             robot.wait_until_stopped(2.0);
             save_images();
           }
-          //robot.do_translation(-1000); 
-          //robot.wait_until_stopped(2.0);
-          //robot.do_translation(-1000); 
           std::cout << "DONE K" << std::endl;
-
-        case 'j':
-          //increment_cluster_id(1);
-          //save_images();
-          for(int jj = 0; jj<10; jj++) 
+          break;
+        case 'o'://go forward every 1m, stopping every 2cm to take an image, never turn
+          increment_cluster_id(1);
+          save_images();
+          for(int jj = 0; jj<50; jj++) 
           {
             increment_cluster_id(1);
-            slow_translate(.1);
+            slow_translate(.02);
             robot.wait_until_stopped(2.0);
             save_images();
           }
-          //robot.do_translation(-1000); 
-          //robot.wait_until_stopped(2.0);
-          //robot.do_translation(-1000); 
-          slow_translate(-1);
-          robot.wait_until_stopped(2.0);
-          slow_translate(-1);
+          std::cout << "DONE K" << std::endl;
+          break;
 
 
 
 
+        //Odometry / SLAM CONTROLS
 
-        //SLAM CONTROLS
-
-        case 'p':
+        /*case 'p':
           success = slam_pause_client.call(empty_srv);
           std::cout << "slam pause:  " << success << std::endl;
           success = slam_pause_odom_client.call(empty_srv);
@@ -320,17 +374,17 @@ private:
           std::cout << "slam resumed:  " << success << std::endl;
           success = slam_resume_odom_client.call(empty_srv);
           std::cout << "slam resumed odom:  " << success << std::endl;
-          break;
+          break; */
         case 'i':
           slam_odom_lock.lock();
-          std::cout << "Slam Odom:" << std::endl;
+          std::cout << "Odom:" << std::endl;
           std::cout << "X: " << cur_x <<  std::endl;
           std::cout << "Y: " << cur_y <<  std::endl;
           std::cout << "Z: " << cur_z <<  std::endl;
           std::cout << "Angle: " << cur_orientation <<  std::endl;
           slam_odom_lock.unlock();
           break;
-
+        
 
 
 
@@ -345,10 +399,14 @@ private:
 
 
 
-
-
-
-
+        case 'P':
+          std::cout << "Begin video capture" << std::endl;
+          for (int jj=1; jj<9000; jj++)
+          {
+            save_images();
+            ros::Duration(.05).sleep();
+          }
+          std::cout << "DONE VIDEO CAPTURE!!!!!" << std::endl;
         case 'q': //quit
           quit = true;
           break;
@@ -396,6 +454,7 @@ private:
 
   void publish_velocities()
   {
+    std::cout << "publish: " << std::to_string(cur_linear) << std::endl;
     control_message.linear.x = cur_linear;
     control_message.angular.z = cur_angular;
     control_pub.publish(control_message);
@@ -431,10 +490,11 @@ private:
 
   void slow_translate(double meter_distance)
   {
-    robot.set_max_speeds(50,0);
-    robot.do_translation(meter_distance*METERS_TO_MILLIMETERS);
-    robot.wait_until_stopped(ros::Duration(.5));
-    robot.set_max_speeds(1000,0);
+    //robot.set_max_speeds(30,10);
+    robot.do_translation(meter_distance*1000);
+    std::cout << "here" << std::endl;
+    robot.wait_until_stopped(ros::Duration(.2), 10);
+    //robot.set_max_speeds(1000,10);
   }//slow_move
 
  
@@ -453,7 +513,7 @@ private:
     //if we are saving, slow down the turns for clear pictures
     if(save)
     {
-      robot.set_max_speeds(0,15); 
+      //robot.set_max_speeds(0,15); 
     }
     else
     {
@@ -489,7 +549,7 @@ private:
     }//for i 
 
     //do the leftover turn
-    if(leftover > 1)
+    if(leftover > 10)
     {
 
       robot.wait_until_stopped(ros::Duration(wait_time));
@@ -505,15 +565,15 @@ private:
       stop_all();
       robot.wait_until_stopped(ros::Duration(wait_time));
       
-      if(save)
-      {  
-        save_images();
-      } 
+     // if(save)
+      //{  
+       // save_images();
+      //} 
 
     }
 
     //reset the max speed to something high
-    robot.set_max_speeds(0,150); 
+   // robot.set_max_speeds(0,150); 
   }//rotate
 
 
@@ -522,20 +582,21 @@ private:
     //make sure odom callback is called
     ros::spinOnce();
     //get current orientation, to make sure we end up there later
-    double org_orientation = cur_orientation; 
-
 
     //rotate and capture 
-    rotate(one_way_turn_max,true,true);//rotate and save
-    rotate(one_way_turn_max,false,false);//go back and dont save
-    rotate(one_way_turn_max,false,false);//rotate to new position 
-    rotate(turn_res,false,false);//rotate to new position, extra to make sure we get coverage
-    rotate(one_way_turn_max,true,true);//go back and save
-    rotate(2*turn_res,true,true);//rotate to new position 
+    rotate(12*turn_res,true,true);//rotate and save
+//    rotate(one_way_turn_max,true,true);//rotate and save
+//    rotate(one_way_turn_max,false,false);//go back and dont save
+//    rotate(one_way_turn_max,false,false);//rotate to new position 
+//    rotate(turn_res,false,false);//rotate to new position, extra to make sure we get coverage
+ //   rotate(one_way_turn_max,true,true);//go back and save
+ //   rotate(2*turn_res,true,true);//rotate to new position 
 
+
+    //rotate(15,true,true);
 
     //make sure we return to the original orientation
-    turn_to_angle(org_orientation);
+//    turn_to_angle(org_orientation);
 
 
 
@@ -561,7 +622,7 @@ private:
     }
   }*/
 
-  void slam_odom_callback(const nav_msgs::Odometry::ConstPtr odom_msg)
+  /*void slam_odom_callback(const nav_msgs::Odometry::ConstPtr odom_msg)
   {
     //ROS_INFO("SLAM ODOM CALLBACK"); 
     double x = odom_msg->pose.pose.position.x;
@@ -586,12 +647,12 @@ private:
     cur_z = z;
     cur_orientation = curo;
     slam_odom_lock.unlock();
-  }
+  }*/
 
 
   void rosaria_odom_callback(const nav_msgs::Odometry::ConstPtr odom_msg)
   {
-    ROS_INFO("SLAM ODOM CALLBACK"); 
+    ROS_INFO("ARIA ODOM CALLBACK"); 
     double x = odom_msg->pose.pose.position.x;
     double y = odom_msg->pose.pose.position.y;
     double z = odom_msg->pose.pose.position.z;
@@ -646,20 +707,31 @@ int main(int argc, char **argv)
 
 
 
-//  ros::init(argc, argv, "kinect2_viewer", ros::init_options::AnonymousName);
-  ros::init(argc, argv, "controller");
+  ros::init(argc, argv, "kinect2_viewer", ros::init_options::AnonymousName);
+//  ros::init(argc, argv, "controller");
 
   if(!ros::ok())
   {
     return 0;
   }
 
+  int start_cluster_id = 0;
 
-  double turn_res = 30;
-  double trans_res = .35;
-  double one_way_turn_max = 180;
+  if(argc > 1)
+  {
+    start_cluster_id = atoi(argv[1]);
+  }
+    
 
-  Controller controller(turn_res,trans_res,one_way_turn_max);
+
+
+  double turn_res = 31.2;
+//  turn_res = 31.4;
+// turn_res = 33.0;
+  double trans_res = .30;
+  double one_way_turn_max = 360;
+
+  Controller controller(turn_res,trans_res,one_way_turn_max, start_cluster_id);
 
   ROS_INFO("starting controller...");
   controller.run();
@@ -667,3 +739,4 @@ int main(int argc, char **argv)
   ros::shutdown();
   return 0;
 }
+
